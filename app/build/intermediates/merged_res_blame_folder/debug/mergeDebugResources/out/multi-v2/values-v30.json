@@ -1,0 +1,19 @@
+{
+    "logs": [
+        {
+            "outputFile": "com.mindmatrix.shishusneh.app-mergeDebugResources-62:/values-v30/values-v30.xml",
+            "map": [
+                {
+                    "source": "C:\\Users\\bhoom\\.gradle\\caches\\9.2.1\\transforms\\ee270e48b124366549a251f3322cd0b2\\workspace\\transformed\\material3-release\\res\\values-v30\\values-v30.xml",
+                    "from": {
+                        "startLines": "2",
+                        "startColumns": "4",
+                        "startOffsets": "55",
+                        "endColumns": "72",
+                        "endOffsets": "123"
+                    }
+                }
+            ]
+        }
+    ]
+}

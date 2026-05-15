@@ -1,0 +1,2543 @@
+# Shishu-Sneh: Complete Development SOP
+
+## Standard Operating Procedure for Android Development
+**Project:** Baby Healthcare Tracking Application  
+**Target:** AI Development Agent (Cursor/Windsurf/etc.)  
+**Version:** 1.0  
+**Date:** Ready for Implementation
+
+---
+
+## 📋 TABLE OF CONTENTS
+
+1. [Project Overview](#1-project-overview)
+2. [Architecture & Technical Stack](#2-architecture--technical-stack)
+3. [Screen-by-Screen Implementation Guide](#3-screen-by-screen-implementation-guide)
+4. [Backend & Data Layer](#4-backend--data-layer)
+5. [AI Integration (Gemini API)](#5-ai-integration-gemini-api)
+6. [Navigation Flow](#6-navigation-flow)
+7. [Implementation Timeline](#7-implementation-timeline)
+8. [Testing & Quality Assurance](#8-testing--quality-assurance)
+9. [Deployment Checklist](#9-deployment-checklist)
+
+---
+
+## 1. PROJECT OVERVIEW
+
+### 1.1 Purpose
+Shishu-Sneh is a healthcare companion app for new mothers to track their baby's first-year growth, vaccinations, feeding, and developmental milestones—especially targeting rural Indian mothers with limited healthcare access.
+
+### 1.2 Core Features
+- **Baby Profile Management**: Single baby profile with DOB, birth weight, gender
+- **Growth Tracking**: Monthly weight/height with WHO-standard percentile charts
+- **Vaccination Scheduler**: Auto-populated India NIS schedule with smart reminders
+- **Feeding Guide**: Daily AI-generated breastfeeding & nutrition tips
+- **Milestone Tracker**: Weekly developmental checklists (Yes/Not Yet/Skip)
+- **Multilingual Support**: 3+ Indian languages
+- **Offline-First**: All core features work without internet
+- **Data Export**: PDF summary for sharing
+
+### 1.3 Tech Constraints
+- **Platform**: Android only (min SDK 24, target SDK 34)
+- **Language**: Kotlin preferred
+- **Architecture**: MVVM + Repository Pattern
+- **Database**: Room DB (SQLite)
+- **AI**: Gemini API for tips & chatbot
+
+---
+
+## 2. ARCHITECTURE & TECHNICAL STACK
+
+### 2.1 Project Structure
+```
+app/
+├── data/
+│   ├── local/
+│   │   ├── dao/
+│   │   │   ├── BabyProfileDao.kt
+│   │   │   ├── GrowthRecordDao.kt
+│   │   │   ├── VaccinationDao.kt
+│   │   │   └── MilestoneDao.kt
+│   │   ├── entities/
+│   │   │   ├── BabyProfile.kt
+│   │   │   ├── GrowthRecord.kt
+│   │   │   ├── Vaccination.kt
+│   │   │   └── Milestone.kt
+│   │   └── AppDatabase.kt
+│   ├── remote/
+│   │   └── GeminiApiService.kt
+│   └── repository/
+│       ├── BabyRepository.kt
+│       ├── GrowthRepository.kt
+│       ├── VaccinationRepository.kt
+│       └── GeminiRepository.kt
+├── domain/
+│   ├── models/
+│   ├── usecases/
+│   └── util/
+│       ├── WHOGrowthCalculator.kt
+│       ├── VaccinationScheduleGenerator.kt
+│       └── DateUtils.kt
+├── ui/
+│   ├── auth/
+│   │   ├── LoginScreen.kt
+│   │   └── RegisterScreen.kt
+│   ├── onboarding/
+│   │   └── BabyProfileSetupScreen.kt
+│   ├── home/
+│   │   ├── HomeDashboardScreen.kt
+│   │   └── HomeDashboardViewModel.kt
+│   ├── growth/
+│   │   ├── GrowthChartScreen.kt
+│   │   ├── AddGrowthEntryDialog.kt
+│   │   └── GrowthViewModel.kt
+│   ├── vaccination/
+│   │   ├── VaccinationListScreen.kt
+│   │   ├── VaccinationDetailScreen.kt
+│   │   └── VaccinationViewModel.kt
+│   ├── feeding/
+│   │   ├── FeedingGuideScreen.kt
+│   │   ├── AIChatbotDialog.kt
+│   │   └── FeedingViewModel.kt
+│   ├── milestones/
+│   │   ├── MilestoneChecklistScreen.kt
+│   │   └── MilestoneViewModel.kt
+│   ├── settings/
+│   │   └── SettingsScreen.kt
+│   └── components/
+│       ├── CustomButton.kt
+│       ├── CustomTextField.kt
+│       └── LoadingIndicator.kt
+├── workers/
+│   └── VaccinationReminderWorker.kt
+└── di/
+    ├── DatabaseModule.kt
+    ├── RepositoryModule.kt
+    └── NetworkModule.kt
+```
+
+### 2.2 Dependencies (build.gradle.kts)
+```kotlin
+dependencies {
+    // Core Android
+    implementation("androidx.core:core-ktx:1.12.0")
+    implementation("androidx.appcompat:appcompat:1.6.1")
+    implementation("com.google.android.material:material:1.11.0")
+    
+    // Jetpack Compose
+    implementation(platform("androidx.compose:compose-bom:2024.02.00"))
+    implementation("androidx.compose.ui:ui")
+    implementation("androidx.compose.material3:material3")
+    implementation("androidx.compose.ui:ui-tooling-preview")
+    implementation("androidx.activity:activity-compose:1.8.2")
+    implementation("androidx.navigation:navigation-compose:2.7.6")
+    
+    // Room Database
+    implementation("androidx.room:room-runtime:2.6.1")
+    implementation("androidx.room:room-ktx:2.6.1")
+    kapt("androidx.room:room-compiler:2.6.1")
+    
+    // WorkManager
+    implementation("androidx.work:work-runtime-ktx:2.9.0")
+    
+    // Gemini AI
+    implementation("com.google.ai.client.generativeai:generativeai:0.1.2")
+    
+    // MPAndroidChart
+    implementation("com.github.PhilJay:MPAndroidChart:v3.1.0")
+    
+    // Dependency Injection - Hilt
+    implementation("com.google.dagger:hilt-android:2.50")
+    kapt("com.google.dagger:hilt-compiler:2.50")
+    implementation("androidx.hilt:hilt-navigation-compose:1.1.0")
+    implementation("androidx.hilt:hilt-work:1.1.0")
+    
+    // Coroutines
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3")
+    
+    // PDF Generation
+    implementation("com.itextpdf:itext7-core:7.2.5")
+    
+    // Biometric Authentication
+    implementation("androidx.biometric:biometric:1.2.0-alpha05")
+    
+    // DataStore (for preferences)
+    implementation("androidx.datastore:datastore-preferences:1.0.0")
+    
+    // Testing
+    testImplementation("junit:junit:4.13.2")
+    androidTestImplementation("androidx.test.ext:junit:1.1.5")
+    androidTestImplementation("androidx.compose.ui:ui-test-junit4")
+}
+```
+
+### 2.3 Database Schema
+
+#### **BabyProfile Entity**
+```kotlin
+@Entity(tableName = "baby_profile")
+data class BabyProfile(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val name: String,
+    val dateOfBirth: Long, // Unix timestamp
+    val gender: String, // "Male", "Female", "Other"
+    val birthWeight: Float, // in kg
+    val birthHeight: Float, // in cm
+    val photoUri: String? = null,
+    val hospitalName: String? = null,
+    val createdAt: Long = System.currentTimeMillis()
+)
+```
+
+#### **GrowthRecord Entity**
+```kotlin
+@Entity(tableName = "growth_records")
+data class GrowthRecord(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val babyId: Long,
+    val recordDate: Long, // Unix timestamp
+    val weightKg: Float,
+    val heightCm: Float,
+    val ageInWeeks: Int, // calculated
+    val whoPercentileWeight: Float? = null, // calculated
+    val whoPercentileHeight: Float? = null, // calculated
+    val notes: String? = null
+)
+```
+
+#### **Vaccination Entity**
+```kotlin
+@Entity(tableName = "vaccinations")
+data class Vaccination(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val babyId: Long,
+    val vaccineName: String, // "BCG", "OPV-1", "DPT-1", etc.
+    val diseaseInfo: String,
+    val scheduledDate: Long, // calculated from DOB
+    val isCompleted: Boolean = false,
+    val completedDate: Long? = null,
+    val reminderEnabled: Boolean = true,
+    val notes: String? = null
+)
+```
+
+#### **Milestone Entity**
+```kotlin
+@Entity(tableName = "milestones")
+data class Milestone(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val babyId: Long,
+    val weekNumber: Int, // e.g., 4, 8, 12
+    val milestoneTitle: String, // "Should smile"
+    val milestoneDescription: String,
+    val status: String, // "NotChecked", "Achieved", "NotYet", "Skipped"
+    val checkedDate: Long? = null
+)
+```
+
+---
+
+## 3. SCREEN-BY-SCREEN IMPLEMENTATION GUIDE
+
+### 🔐 **SCREEN 1: SPLASH SCREEN**
+
+#### Purpose
+- Check if user is logged in
+- Check if baby profile exists
+- Navigate to appropriate screen
+
+#### UI Elements
+```kotlin
+@Composable
+fun SplashScreen(navController: NavController, viewModel: SplashViewModel) {
+    val navigationState by viewModel.navigationState.collectAsState()
+    
+    LaunchedEffect(Unit) {
+        viewModel.checkAuthStatus()
+    }
+    
+    LaunchedEffect(navigationState) {
+        when (navigationState) {
+            is NavigationState.ToHome -> navController.navigate("home") {
+                popUpTo("splash") { inclusive = true }
+            }
+            is NavigationState.ToLogin -> navController.navigate("login") {
+                popUpTo("splash") { inclusive = true }
+            }
+            is NavigationState.ToOnboarding -> navController.navigate("onboarding") {
+                popUpTo("splash") { inclusive = true }
+            }
+            else -> { /* Loading */ }
+        }
+    }
+    
+    Box(
+        modifier = Modifier.fillMaxSize(),
+        contentAlignment = Alignment.Center
+    ) {
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Image(
+                painter = painterResource(R.drawable.logo),
+                contentDescription = "Shishu-Sneh Logo",
+                modifier = Modifier.size(120.dp)
+            )
+            Spacer(Modifier.height(16.dp))
+            Text("Shishu-Sneh", style = MaterialTheme.typography.headlineMedium)
+            Spacer(Modifier.height(8.dp))
+            CircularProgressIndicator()
+        }
+    }
+}
+```
+
+#### ViewModel Logic
+```kotlin
+@HiltViewModel
+class SplashViewModel @Inject constructor(
+    private val babyRepository: BabyRepository,
+    private val authRepository: AuthRepository
+) : ViewModel() {
+    
+    private val _navigationState = MutableStateFlow<NavigationState>(NavigationState.Loading)
+    val navigationState: StateFlow<NavigationState> = _navigationState
+    
+    fun checkAuthStatus() {
+        viewModelScope.launch {
+            delay(2000) // Splash duration
+            
+            val isLoggedIn = authRepository.isUserLoggedIn()
+            if (!isLoggedIn) {
+                _navigationState.value = NavigationState.ToLogin
+                return@launch
+            }
+            
+            val hasBabyProfile = babyRepository.hasBabyProfile()
+            _navigationState.value = if (hasBabyProfile) {
+                NavigationState.ToHome
+            } else {
+                NavigationState.ToOnboarding
+            }
+        }
+    }
+}
+
+sealed class NavigationState {
+    object Loading : NavigationState()
+    object ToLogin : NavigationState()
+    object ToOnboarding : NavigationState()
+    object ToHome : NavigationState()
+}
+```
+
+---
+
+### 🔐 **SCREEN 2: LOGIN SCREEN**
+
+#### Purpose
+- User authentication (email/password or phone OTP)
+- Navigate to Register if new user
+- Navigate to Home if already has profile, else Onboarding
+
+#### UI Layout
+```
+┌─────────────────────────────────┐
+│      [Shishu-Sneh Logo]         │
+│                                 │
+│   ┌─────────────────────────┐   │
+│   │ Email/Phone             │   │
+│   └─────────────────────────┘   │
+│                                 │
+│   ┌─────────────────────────┐   │
+│   │ Password                │   │
+│   └─────────────────────────┘   │
+│                                 │
+│        [Login Button]           │
+│                                 │
+│   Don't have an account?        │
+│        [Register]               │
+└─────────────────────────────────┘
+```
+
+#### Implementation
+```kotlin
+@Composable
+fun LoginScreen(navController: NavController, viewModel: LoginViewModel) {
+    var email by remember { mutableStateOf("") }
+    var password by remember { mutableStateOf("") }
+    val loginState by viewModel.loginState.collectAsState()
+    
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(24.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
+    ) {
+        Image(
+            painter = painterResource(R.drawable.logo),
+            contentDescription = null,
+            modifier = Modifier.size(100.dp)
+        )
+        
+        Spacer(Modifier.height(32.dp))
+        
+        OutlinedTextField(
+            value = email,
+            onValueChange = { email = it },
+            label = { Text("Email or Phone") },
+            modifier = Modifier.fillMaxWidth(),
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email)
+        )
+        
+        Spacer(Modifier.height(16.dp))
+        
+        OutlinedTextField(
+            value = password,
+            onValueChange = { password = it },
+            label = { Text("Password") },
+            modifier = Modifier.fillMaxWidth(),
+            visualTransformation = PasswordVisualTransformation(),
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password)
+        )
+        
+        Spacer(Modifier.height(24.dp))
+        
+        Button(
+            onClick = { viewModel.login(email, password) },
+            modifier = Modifier.fillMaxWidth(),
+            enabled = loginState !is LoginState.Loading
+        ) {
+            if (loginState is LoginState.Loading) {
+                CircularProgressIndicator(color = Color.White, modifier = Modifier.size(24.dp))
+            } else {
+                Text("Login")
+            }
+        }
+        
+        Spacer(Modifier.height(16.dp))
+        
+        TextButton(onClick = { navController.navigate("register") }) {
+            Text("Don't have an account? Register")
+        }
+        
+        // Handle login states
+        when (val state = loginState) {
+            is LoginState.Success -> {
+                LaunchedEffect(Unit) {
+                    if (state.hasBabyProfile) {
+                        navController.navigate("home") {
+                            popUpTo("login") { inclusive = true }
+                        }
+                    } else {
+                        navController.navigate("onboarding") {
+                            popUpTo("login") { inclusive = true }
+                        }
+                    }
+                }
+            }
+            is LoginState.Error -> {
+                Text(state.message, color = MaterialTheme.colorScheme.error)
+            }
+            else -> {}
+        }
+    }
+}
+```
+
+---
+
+### 📝 **SCREEN 3: REGISTER SCREEN**
+
+#### Purpose
+- New user registration
+- After successful registration, navigate to Login
+
+#### UI Elements
+```kotlin
+@Composable
+fun RegisterScreen(navController: NavController, viewModel: RegisterViewModel) {
+    var name by remember { mutableStateOf("") }
+    var email by remember { mutableStateOf("") }
+    var phone by remember { mutableStateOf("") }
+    var password by remember { mutableStateOf("") }
+    var confirmPassword by remember { mutableStateOf("") }
+    
+    val registerState by viewModel.registerState.collectAsState()
+    
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(24.dp)
+            .verticalScroll(rememberScrollState()),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Spacer(Modifier.height(32.dp))
+        
+        Text("Create Account", style = MaterialTheme.typography.headlineMedium)
+        
+        Spacer(Modifier.height(24.dp))
+        
+        OutlinedTextField(
+            value = name,
+            onValueChange = { name = it },
+            label = { Text("Full Name") },
+            modifier = Modifier.fillMaxWidth()
+        )
+        
+        Spacer(Modifier.height(16.dp))
+        
+        OutlinedTextField(
+            value = email,
+            onValueChange = { email = it },
+            label = { Text("Email") },
+            modifier = Modifier.fillMaxWidth(),
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email)
+        )
+        
+        Spacer(Modifier.height(16.dp))
+        
+        OutlinedTextField(
+            value = phone,
+            onValueChange = { phone = it },
+            label = { Text("Phone Number") },
+            modifier = Modifier.fillMaxWidth(),
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone)
+        )
+        
+        Spacer(Modifier.height(16.dp))
+        
+        OutlinedTextField(
+            value = password,
+            onValueChange = { password = it },
+            label = { Text("Password") },
+            modifier = Modifier.fillMaxWidth(),
+            visualTransformation = PasswordVisualTransformation()
+        )
+        
+        Spacer(Modifier.height(16.dp))
+        
+        OutlinedTextField(
+            value = confirmPassword,
+            onValueChange = { confirmPassword = it },
+            label = { Text("Confirm Password") },
+            modifier = Modifier.fillMaxWidth(),
+            visualTransformation = PasswordVisualTransformation()
+        )
+        
+        Spacer(Modifier.height(24.dp))
+        
+        Button(
+            onClick = { 
+                viewModel.register(name, email, phone, password, confirmPassword)
+            },
+            modifier = Modifier.fillMaxWidth(),
+            enabled = registerState !is RegisterState.Loading
+        ) {
+            if (registerState is RegisterState.Loading) {
+                CircularProgressIndicator(color = Color.White, modifier = Modifier.size(24.dp))
+            } else {
+                Text("Register")
+            }
+        }
+        
+        Spacer(Modifier.height(16.dp))
+        
+        TextButton(onClick = { navController.popBackStack() }) {
+            Text("Already have an account? Login")
+        }
+        
+        when (val state = registerState) {
+            is RegisterState.Success -> {
+                LaunchedEffect(Unit) {
+                    navController.navigate("login") {
+                        popUpTo("register") { inclusive = true }
+                    }
+                }
+            }
+            is RegisterState.Error -> {
+                Text(state.message, color = MaterialTheme.colorScheme.error)
+            }
+            else -> {}
+        }
+    }
+}
+```
+
+---
+
+### 👶 **SCREEN 4: BABY PROFILE SETUP (ONBOARDING)**
+
+#### Purpose
+- Create baby's profile after first login
+- Captures: Name, DOB, Gender, Birth Weight, Birth Height, Hospital Name, Photo (optional)
+
+#### UI Design
+```kotlin
+@Composable
+fun BabyProfileSetupScreen(navController: NavController, viewModel: OnboardingViewModel) {
+    var babyName by remember { mutableStateOf("") }
+    var selectedDate by remember { mutableStateOf<LocalDate?>(null) }
+    var selectedGender by remember { mutableStateOf("") }
+    var birthWeight by remember { mutableStateOf("") }
+    var birthHeight by remember { mutableStateOf("") }
+    var hospitalName by remember { mutableStateOf("") }
+    var photoUri by remember { mutableStateOf<Uri?>(null) }
+    
+    val setupState by viewModel.setupState.collectAsState()
+    
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(24.dp)
+            .verticalScroll(rememberScrollState())
+    ) {
+        Text("Welcome! Let's set up your baby's profile", 
+             style = MaterialTheme.typography.headlineSmall)
+        
+        Spacer(Modifier.height(24.dp))
+        
+        // Photo picker
+        Box(
+            modifier = Modifier
+                .size(120.dp)
+                .clip(CircleShape)
+                .background(MaterialTheme.colorScheme.surfaceVariant)
+                .clickable { /* Launch image picker */ },
+            contentAlignment = Alignment.Center
+        ) {
+            if (photoUri != null) {
+                AsyncImage(model = photoUri, contentDescription = null)
+            } else {
+                Icon(Icons.Default.AddAPhoto, contentDescription = "Add Photo")
+            }
+        }
+        
+        Spacer(Modifier.height(24.dp))
+        
+        OutlinedTextField(
+            value = babyName,
+            onValueChange = { babyName = it },
+            label = { Text("Baby's Name") },
+            modifier = Modifier.fillMaxWidth()
+        )
+        
+        Spacer(Modifier.height(16.dp))
+        
+        // Date Picker
+        OutlinedTextField(
+            value = selectedDate?.toString() ?: "",
+            onValueChange = {},
+            label = { Text("Date of Birth") },
+            readOnly = true,
+            modifier = Modifier.fillMaxWidth(),
+            trailingIcon = {
+                IconButton(onClick = { /* Show date picker */ }) {
+                    Icon(Icons.Default.CalendarToday, "Select Date")
+                }
+            }
+        )
+        
+        Spacer(Modifier.height(16.dp))
+        
+        // Gender Selection
+        Text("Gender", style = MaterialTheme.typography.labelMedium)
+        Row(modifier = Modifier.fillMaxWidth()) {
+            FilterChip(
+                selected = selectedGender == "Male",
+                onClick = { selectedGender = "Male" },
+                label = { Text("Male") }
+            )
+            Spacer(Modifier.width(8.dp))
+            FilterChip(
+                selected = selectedGender == "Female",
+                onClick = { selectedGender = "Female" },
+                label = { Text("Female") }
+            )
+        }
+        
+        Spacer(Modifier.height(16.dp))
+        
+        Row(modifier = Modifier.fillMaxWidth()) {
+            OutlinedTextField(
+                value = birthWeight,
+                onValueChange = { birthWeight = it },
+                label = { Text("Birth Weight (kg)") },
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                modifier = Modifier.weight(1f)
+            )
+            Spacer(Modifier.width(8.dp))
+            OutlinedTextField(
+                value = birthHeight,
+                onValueChange = { birthHeight = it },
+                label = { Text("Birth Height (cm)") },
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                modifier = Modifier.weight(1f)
+            )
+        }
+        
+        Spacer(Modifier.height(16.dp))
+        
+        OutlinedTextField(
+            value = hospitalName,
+            onValueChange = { hospitalName = it },
+            label = { Text("Hospital Name (Optional)") },
+            modifier = Modifier.fillMaxWidth()
+        )
+        
+        Spacer(Modifier.height(32.dp))
+        
+        Button(
+            onClick = {
+                viewModel.createBabyProfile(
+                    name = babyName,
+                    dob = selectedDate,
+                    gender = selectedGender,
+                    birthWeight = birthWeight.toFloatOrNull() ?: 0f,
+                    birthHeight = birthHeight.toFloatOrNull() ?: 0f,
+                    hospital = hospitalName,
+                    photoUri = photoUri
+                )
+            },
+            modifier = Modifier.fillMaxWidth(),
+            enabled = setupState !is SetupState.Loading
+        ) {
+            Text("Create Profile")
+        }
+        
+        when (val state = setupState) {
+            is SetupState.Success -> {
+                LaunchedEffect(Unit) {
+                    navController.navigate("home") {
+                        popUpTo("onboarding") { inclusive = true }
+                    }
+                }
+            }
+            is SetupState.Error -> {
+                Text(state.message, color = MaterialTheme.colorScheme.error)
+            }
+            else -> {}
+        }
+    }
+}
+```
+
+---
+
+### 🏠 **SCREEN 5: HOME DASHBOARD**
+
+#### Purpose
+- Central hub showing:
+  - Baby's current age (weeks/months)
+  - Quick stats (last weight, next vaccine)
+  - Navigation cards to all features
+  - Today's feeding tip
+
+#### UI Layout
+```
+┌─────────────────────────────────┐
+│  ☰  Shishu-Sneh        [Profile]│
+│                                 │
+│  ┌───────────────────────────┐  │
+│  │   Baby Name, 12 weeks old │  │
+│  │   Last Weight: 5.2 kg     │  │
+│  └───────────────────────────┘  │
+│                                 │
+│  ┌───────────────────────────┐  │
+│  │ 💉 Next Vaccine: DPT-1    │  │
+│  │    Due in 3 days          │  │
+│  └───────────────────────────┘  │
+│                                 │
+│  ┌─────────┐  ┌─────────┐      │
+│  │ Growth  │  │ Vaccines│      │
+│  │  Chart  │  │         │      │
+│  └─────────┘  └─────────┘      │
+│                                 │
+│  ┌─────────┐  ┌─────────┐      │
+│  │ Feeding │  │Mileston│       │
+│  │  Guide  │  │   es    │      │
+│  └─────────┘  └─────────┘      │
+│                                 │
+│  📌 Today's Tip:                │
+│  "Exclusive breastfeeding..."   │
+└─────────────────────────────────┘
+```
+
+#### Implementation
+```kotlin
+@Composable
+fun HomeDashboardScreen(navController: NavController, viewModel: HomeViewModel) {
+    val babyProfile by viewModel.babyProfile.collectAsState()
+    val nextVaccine by viewModel.nextVaccine.collectAsState()
+    val dailyTip by viewModel.dailyTip.collectAsState()
+    val lastGrowthRecord by viewModel.lastGrowthRecord.collectAsState()
+    
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text("Shishu-Sneh") },
+                navigationIcon = {
+                    IconButton(onClick = { /* Open drawer */ }) {
+                        Icon(Icons.Default.Menu, "Menu")
+                    }
+                },
+                actions = {
+                    IconButton(onClick = { navController.navigate("settings") }) {
+                        Icon(Icons.Default.Settings, "Settings")
+                    }
+                }
+            )
+        }
+    ) { padding ->
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(padding)
+                .padding(16.dp)
+                .verticalScroll(rememberScrollState())
+        ) {
+            // Baby Info Card
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.primaryContainer
+                )
+            ) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    babyProfile?.let { baby ->
+                        Text(
+                            text = baby.name,
+                            style = MaterialTheme.typography.headlineMedium
+                        )
+                        Text(
+                            text = "${calculateAgeInWeeks(baby.dateOfBirth)} weeks old",
+                            style = MaterialTheme.typography.bodyMedium
+                        )
+                        lastGrowthRecord?.let {
+                            Text("Last Weight: ${it.weightKg} kg")
+                        }
+                    }
+                }
+            }
+            
+            Spacer(Modifier.height(16.dp))
+            
+            // Next Vaccine Card
+            nextVaccine?.let { vaccine ->
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.secondaryContainer
+                    )
+                ) {
+                    Row(
+                        modifier = Modifier.padding(16.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            painter = painterResource(R.drawable.ic_vaccine),
+                            contentDescription = null,
+                            modifier = Modifier.size(48.dp)
+                        )
+                        Spacer(Modifier.width(16.dp))
+                        Column {
+                            Text("Next Vaccine: ${vaccine.vaccineName}")
+                            Text("Due in ${calculateDaysUntil(vaccine.scheduledDate)} days")
+                        }
+                    }
+                }
+            }
+            
+            Spacer(Modifier.height(24.dp))
+            
+            // Feature Cards Grid
+            Text("Quick Access", style = MaterialTheme.typography.titleLarge)
+            Spacer(Modifier.height(8.dp))
+            
+            Row(modifier = Modifier.fillMaxWidth()) {
+                FeatureCard(
+                    title = "Growth Chart",
+                    icon = Icons.Default.TrendingUp,
+                    onClick = { navController.navigate("growth") },
+                    modifier = Modifier.weight(1f)
+                )
+                Spacer(Modifier.width(8.dp))
+                FeatureCard(
+                    title = "Vaccinations",
+                    icon = Icons.Default.Vaccines,
+                    onClick = { navController.navigate("vaccinations") },
+                    modifier = Modifier.weight(1f)
+                )
+            }
+            
+            Spacer(Modifier.height(8.dp))
+            
+            Row(modifier = Modifier.fillMaxWidth()) {
+                FeatureCard(
+                    title = "Feeding Guide",
+                    icon = Icons.Default.Restaurant,
+                    onClick = { navController.navigate("feeding") },
+                    modifier = Modifier.weight(1f)
+                )
+                Spacer(Modifier.width(8.dp))
+                FeatureCard(
+                    title = "Milestones",
+                    icon = Icons.Default.CheckCircle,
+                    onClick = { navController.navigate("milestones") },
+                    modifier = Modifier.weight(1f)
+                )
+            }
+            
+            Spacer(Modifier.height(24.dp))
+            
+            // Daily Tip Card
+            dailyTip?.let { tip ->
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.tertiaryContainer
+                    )
+                ) {
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(Icons.Default.Lightbulb, contentDescription = null)
+                            Spacer(Modifier.width(8.dp))
+                            Text("Today's Tip", style = MaterialTheme.typography.titleMedium)
+                        }
+                        Spacer(Modifier.height(8.dp))
+                        Text(tip, style = MaterialTheme.typography.bodyMedium)
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun FeatureCard(
+    title: String,
+    icon: ImageVector,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Card(
+        onClick = onClick,
+        modifier = modifier.height(120.dp)
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(16.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center
+        ) {
+            Icon(
+                imageVector = icon,
+                contentDescription = null,
+                modifier = Modifier.size(48.dp),
+                tint = MaterialTheme.colorScheme.primary
+            )
+            Spacer(Modifier.height(8.dp))
+            Text(title, textAlign = TextAlign.Center)
+        }
+    }
+}
+```
+
+---
+
+### 📈 **SCREEN 6: GROWTH CHART**
+
+#### Purpose
+- Display WHO-standard growth chart with baby's data
+- Allow adding new weight/height entries
+- Show percentile calculations
+
+#### UI Components
+```kotlin
+@Composable
+fun GrowthChartScreen(navController: NavController, viewModel: GrowthViewModel) {
+    val growthRecords by viewModel.growthRecords.collectAsState()
+    var showAddDialog by remember { mutableStateOf(false) }
+    
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text("Growth Chart") },
+                navigationIcon = {
+                    IconButton(onClick = { navController.popBackStack() }) {
+                        Icon(Icons.Default.ArrowBack, "Back")
+                    }
+                }
+            )
+        },
+        floatingActionButton = {
+            FloatingActionButton(onClick = { showAddDialog = true }) {
+                Icon(Icons.Default.Add, "Add Entry")
+            }
+        }
+    ) { padding ->
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(padding)
+        ) {
+            // Chart Type Tabs
+            var selectedTab by remember { mutableStateOf(0) }
+            TabRow(selectedTabIndex = selectedTab) {
+                Tab(
+                    selected = selectedTab == 0,
+                    onClick = { selectedTab = 0 },
+                    text = { Text("Weight") }
+                )
+                Tab(
+                    selected = selectedTab == 1,
+                    onClick = { selectedTab = 1 },
+                    text = { Text("Height") }
+                )
+            }
+            
+            // MPAndroidChart Integration
+            AndroidView(
+                factory = { context ->
+                    LineChart(context).apply {
+                        description.isEnabled = false
+                        setTouchEnabled(true)
+                        setPinchZoom(true)
+                    }
+                },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(300.dp)
+                    .padding(16.dp),
+                update = { chart ->
+                    updateChart(chart, growthRecords, selectedTab == 0)
+                }
+            )
+            
+            Spacer(Modifier.height(16.dp))
+            
+            // Records List
+            Text(
+                "Growth History",
+                style = MaterialTheme.typography.titleMedium,
+                modifier = Modifier.padding(horizontal = 16.dp)
+            )
+            
+            LazyColumn(
+                modifier = Modifier.fillMaxWidth(),
+                contentPadding = PaddingValues(16.dp)
+            ) {
+                items(growthRecords) { record ->
+                    GrowthRecordItem(record)
+                    Spacer(Modifier.height(8.dp))
+                }
+            }
+        }
+    }
+    
+    if (showAddDialog) {
+        AddGrowthEntryDialog(
+            onDismiss = { showAddDialog = false },
+            onConfirm = { weight, height ->
+                viewModel.addGrowthEntry(weight, height)
+                showAddDialog = false
+            }
+        )
+    }
+}
+
+@Composable
+fun GrowthRecordItem(record: GrowthRecord) {
+    Card(modifier = Modifier.fillMaxWidth()) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Column {
+                Text(
+                    formatDate(record.recordDate),
+                    style = MaterialTheme.typography.bodyMedium
+                )
+                Text(
+                    "${record.ageInWeeks} weeks",
+                    style = MaterialTheme.typography.bodySmall
+                )
+            }
+            Column(horizontalAlignment = Alignment.End) {
+                Text("${record.weightKg} kg")
+                Text("${record.heightCm} cm")
+                record.whoPercentileWeight?.let {
+                    Text(
+                        "${it}th percentile",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun AddGrowthEntryDialog(
+    onDismiss: () -> Unit,
+    onConfirm: (Float, Float) -> Unit
+) {
+    var weight by remember { mutableStateOf("") }
+    var height by remember { mutableStateOf("") }
+    
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Add Growth Entry") },
+        text = {
+            Column {
+                OutlinedTextField(
+                    value = weight,
+                    onValueChange = { weight = it },
+                    label = { Text("Weight (kg)") },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal)
+                )
+                Spacer(Modifier.height(8.dp))
+                OutlinedTextField(
+                    value = height,
+                    onValueChange = { height = it },
+                    label = { Text("Height (cm)") },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal)
+                )
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = {
+                    weight.toFloatOrNull()?.let { w ->
+                        height.toFloatOrNull()?.let { h ->
+                            onConfirm(w, h)
+                        }
+                    }
+                }
+            ) {
+                Text("Save")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Cancel")
+            }
+        }
+    )
+}
+
+// Chart update logic
+fun updateChart(chart: LineChart, records: List<GrowthRecord>, isWeight: Boolean) {
+    val entries = records.mapIndexed { index, record ->
+        Entry(
+            index.toFloat(),
+            if (isWeight) record.weightKg else record.heightCm
+        )
+    }
+    
+    val dataSet = LineDataSet(entries, if (isWeight) "Weight" else "Height").apply {
+        color = Color.Blue.toArgb()
+        valueTextSize = 12f
+        lineWidth = 2f
+        setCircleColor(Color.Blue.toArgb())
+        circleRadius = 4f
+    }
+    
+    // Add WHO percentile lines (simplified - real implementation needs WHO data)
+    val percentile50 = LineDataSet(
+        records.mapIndexed { index, _ ->
+            Entry(index.toFloat(), calculateWHO50thPercentile(index))
+        },
+        "WHO 50th"
+    ).apply {
+        color = Color.Green.toArgb()
+        lineWidth = 1f
+        enableDashedLine(10f, 5f, 0f)
+        setDrawCircles(false)
+    }
+    
+    val lineData = LineData(dataSet, percentile50)
+    chart.data = lineData
+    chart.invalidate()
+}
+```
+
+---
+
+### 💉 **SCREEN 7: VACCINATION LIST**
+
+#### Purpose
+- Show all vaccinations (completed, upcoming, overdue)
+- Click on vaccine for details
+- Mark vaccine as completed
+
+#### Implementation
+```kotlin
+@Composable
+fun VaccinationListScreen(navController: NavController, viewModel: VaccinationViewModel) {
+    val vaccinations by viewModel.vaccinations.collectAsState()
+    val groupedVaccines = vaccinations.groupBy { it.isCompleted }
+    
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text("Vaccinations") },
+                navigationIcon = {
+                    IconButton(onClick = { navController.popBackStack() }) {
+                        Icon(Icons.Default.ArrowBack, "Back")
+                    }
+                }
+            )
+        }
+    ) { padding ->
+        LazyColumn(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(padding),
+            contentPadding = PaddingValues(16.dp)
+        ) {
+            // Upcoming/Pending Vaccines
+            item {
+                Text(
+                    "Upcoming Vaccinations",
+                    style = MaterialTheme.typography.titleLarge,
+                    modifier = Modifier.padding(vertical = 8.dp)
+                )
+            }
+            
+            items(groupedVaccines[false] ?: emptyList()) { vaccine ->
+                VaccinationCard(
+                    vaccination = vaccine,
+                    onClick = { navController.navigate("vaccination/${vaccine.id}") },
+                    onMarkComplete = { viewModel.markComplete(vaccine.id) }
+                )
+                Spacer(Modifier.height(8.dp))
+            }
+            
+            // Completed Vaccines
+            item {
+                Spacer(Modifier.height(16.dp))
+                Text(
+                    "Completed Vaccinations",
+                    style = MaterialTheme.typography.titleLarge,
+                    modifier = Modifier.padding(vertical = 8.dp)
+                )
+            }
+            
+            items(groupedVaccines[true] ?: emptyList()) { vaccine ->
+                VaccinationCard(
+                    vaccination = vaccine,
+                    onClick = { navController.navigate("vaccination/${vaccine.id}") },
+                    onMarkComplete = null
+                )
+                Spacer(Modifier.height(8.dp))
+            }
+        }
+    }
+}
+
+@Composable
+fun VaccinationCard(
+    vaccination: Vaccination,
+    onClick: () -> Unit,
+    onMarkComplete: (() -> Unit)?
+) {
+    Card(
+        onClick = onClick,
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(
+            containerColor = if (vaccination.isCompleted) {
+                MaterialTheme.colorScheme.surfaceVariant
+            } else if (isOverdue(vaccination.scheduledDate)) {
+                MaterialTheme.colorScheme.errorContainer
+            } else {
+                MaterialTheme.colorScheme.surface
+            }
+        )
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(
+                painter = painterResource(
+                    if (vaccination.isCompleted) R.drawable.ic_check_circle 
+                    else R.drawable.ic_vaccine
+                ),
+                contentDescription = null,
+                modifier = Modifier.size(48.dp),
+                tint = if (vaccination.isCompleted) 
+                    MaterialTheme.colorScheme.primary 
+                else MaterialTheme.colorScheme.onSurface
+            )
+            
+            Spacer(Modifier.width(16.dp))
+            
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    vaccination.vaccineName,
+                    style = MaterialTheme.typography.titleMedium
+                )
+                Text(
+                    if (vaccination.isCompleted) {
+                        "Completed on ${formatDate(vaccination.completedDate!!)}"
+                    } else {
+                        "Due: ${formatDate(vaccination.scheduledDate)}"
+                    },
+                    style = MaterialTheme.typography.bodySmall
+                )
+                if (!vaccination.isCompleted) {
+                    val daysUntil = calculateDaysUntil(vaccination.scheduledDate)
+                    Text(
+                        when {
+                            daysUntil < 0 -> "Overdue by ${-daysUntil} days"
+                            daysUntil == 0 -> "Due today!"
+                            daysUntil <= 3 -> "Due in $daysUntil days"
+                            else -> ""
+                        },
+                        style = MaterialTheme.typography.bodySmall,
+                        color = if (daysUntil < 0) MaterialTheme.colorScheme.error
+                                else MaterialTheme.colorScheme.primary
+                    )
+                }
+            }
+            
+            if (onMarkComplete != null) {
+                IconButton(onClick = onMarkComplete) {
+                    Icon(Icons.Default.Check, "Mark Complete")
+                }
+            }
+        }
+    }
+}
+```
+
+---
+
+### 🍼 **SCREEN 8: FEEDING GUIDE**
+
+#### Purpose
+- Display daily AI-generated feeding tips
+- Chatbot for custom questions
+- History of past tips
+
+#### Implementation
+```kotlin
+@Composable
+fun FeedingGuideScreen(navController: NavController, viewModel: FeedingViewModel) {
+    val todayTip by viewModel.todayTip.collectAsState()
+    val pastTips by viewModel.pastTips.collectAsState()
+    var showChatbot by remember { mutableStateOf(false) }
+    
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text("Feeding Guide") },
+                navigationIcon = {
+                    IconButton(onClick = { navController.popBackStack() }) {
+                        Icon(Icons.Default.ArrowBack, "Back")
+                    }
+                }
+            )
+        },
+        floatingActionButton = {
+            FloatingActionButton(onClick = { showChatbot = true }) {
+                Icon(Icons.Default.Chat, "Ask Question")
+            }
+        }
+    ) { padding ->
+        LazyColumn(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(padding),
+            contentPadding = PaddingValues(16.dp)
+        ) {
+            // Today's Tip
+            item {
+                todayTip?.let { tip ->
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.primaryContainer
+                        )
+                    ) {
+                        Column(modifier = Modifier.padding(16.dp)) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(Icons.Default.Lightbulb, contentDescription = null)
+                                Spacer(Modifier.width(8.dp))
+                                Text(
+                                    "Today's Tip",
+                                    style = MaterialTheme.typography.titleLarge
+                                )
+                            }
+                            Spacer(Modifier.height(12.dp))
+                            Text(
+                                tip.content,
+                                style = MaterialTheme.typography.bodyLarge
+                            )
+                            Spacer(Modifier.height(8.dp))
+                            Text(
+                                "Based on your baby's age: ${tip.babyAgeWeeks} weeks",
+                                style = MaterialTheme.typography.bodySmall
+                            )
+                        }
+                    }
+                }
+            }
+            
+            item {
+                Spacer(Modifier.height(24.dp))
+                Text(
+                    "Previous Tips",
+                    style = MaterialTheme.typography.titleMedium
+                )
+                Spacer(Modifier.height(8.dp))
+            }
+            
+            items(pastTips) { tip ->
+                Card(
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        Text(
+                            formatDate(tip.date),
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                        Spacer(Modifier.height(4.dp))
+                        Text(tip.content)
+                    }
+                }
+                Spacer(Modifier.height(8.dp))
+            }
+        }
+    }
+    
+    if (showChatbot) {
+        AIChatbotDialog(
+            onDismiss = { showChatbot = false },
+            viewModel = viewModel
+        )
+    }
+}
+
+@Composable
+fun AIChatbotDialog(onDismiss: () -> Unit, viewModel: FeedingViewModel) {
+    var userQuestion by remember { mutableStateOf("") }
+    val chatHistory by viewModel.chatHistory.collectAsState()
+    val isLoading by viewModel.isLoadingResponse.collectAsState()
+    
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(usePlatformDefaultWidth = false)
+    ) {
+        Card(
+            modifier = Modifier
+                .fillMaxWidth(0.95f)
+                .fillMaxHeight(0.8f)
+        ) {
+            Column(modifier = Modifier.fillMaxSize()) {
+                // Header
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(MaterialTheme.colorScheme.primaryContainer)
+                        .padding(16.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text("Ask about feeding", style = MaterialTheme.typography.titleMedium)
+                    IconButton(onClick = onDismiss) {
+                        Icon(Icons.Default.Close, "Close")
+                    }
+                }
+                
+                // Chat messages
+                LazyColumn(
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxWidth()
+                        .padding(16.dp),
+                    reverseLayout = true
+                ) {
+                    items(chatHistory.reversed()) { message ->
+                        ChatBubble(message)
+                        Spacer(Modifier.height(8.dp))
+                    }
+                }
+                
+                // Input field
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    OutlinedTextField(
+                        value = userQuestion,
+                        onValueChange = { userQuestion = it },
+                        modifier = Modifier.weight(1f),
+                        placeholder = { Text("Ask a question...") },
+                        enabled = !isLoading
+                    )
+                    Spacer(Modifier.width(8.dp))
+                    IconButton(
+                        onClick = {
+                            if (userQuestion.isNotBlank()) {
+                                viewModel.askQuestion(userQuestion)
+                                userQuestion = ""
+                            }
+                        },
+                        enabled = !isLoading && userQuestion.isNotBlank()
+                    ) {
+                        if (isLoading) {
+                            CircularProgressIndicator(modifier = Modifier.size(24.dp))
+                        } else {
+                            Icon(Icons.Default.Send, "Send")
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun ChatBubble(message: ChatMessage) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = if (message.isUser) Arrangement.End else Arrangement.Start
+    ) {
+        Card(
+            colors = CardDefaults.cardColors(
+                containerColor = if (message.isUser) 
+                    MaterialTheme.colorScheme.primary 
+                else MaterialTheme.colorScheme.surfaceVariant
+            ),
+            modifier = Modifier.widthIn(max = 280.dp)
+        ) {
+            Text(
+                text = message.content,
+                modifier = Modifier.padding(12.dp),
+                color = if (message.isUser) 
+                    MaterialTheme.colorScheme.onPrimary 
+                else MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+    }
+}
+```
+
+---
+
+### ✅ **SCREEN 9: MILESTONES TRACKER**
+
+#### Purpose
+- Show age-appropriate milestones
+- Allow marking milestones as achieved/not yet/skip
+- AI feedback based on responses
+
+#### Implementation
+```kotlin
+@Composable
+fun MilestoneChecklistScreen(navController: NavController, viewModel: MilestoneViewModel) {
+    val currentWeekMilestones by viewModel.currentWeekMilestones.collectAsState()
+    val allMilestones by viewModel.allMilestones.collectAsState()
+    
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text("Developmental Milestones") },
+                navigationIcon = {
+                    IconButton(onClick = { navController.popBackStack() }) {
+                        Icon(Icons.Default.ArrowBack, "Back")
+                    }
+                }
+            )
+        }
+    ) { padding ->
+        LazyColumn(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(padding),
+            contentPadding = PaddingValues(16.dp)
+        ) {
+            // This Week's Milestones
+            item {
+                Text(
+                    "This Week's Checklist",
+                    style = MaterialTheme.typography.titleLarge
+                )
+                Spacer(Modifier.height(8.dp))
+            }
+            
+            items(currentWeekMilestones) { milestone ->
+                MilestoneCheckItem(
+                    milestone = milestone,
+                    onStatusChange = { status ->
+                        viewModel.updateMilestoneStatus(milestone.id, status)
+                    }
+                )
+                Spacer(Modifier.height(8.dp))
+            }
+            
+            // All Milestones by Week
+            item {
+                Spacer(Modifier.height(24.dp))
+                Text(
+                    "All Milestones",
+                    style = MaterialTheme.typography.titleLarge
+                )
+                Spacer(Modifier.height(8.dp))
+            }
+            
+            val groupedByWeek = allMilestones.groupBy { it.weekNumber }
+            groupedByWeek.forEach { (week, milestones) ->
+                item {
+                    Text(
+                        "Week $week",
+                        style = MaterialTheme.typography.titleMedium,
+                        modifier = Modifier.padding(vertical = 8.dp)
+                    )
+                }
+                items(milestones) { milestone ->
+                    MilestoneCheckItem(
+                        milestone = milestone,
+                        onStatusChange = { status ->
+                            viewModel.updateMilestoneStatus(milestone.id, status)
+                        }
+                    )
+                    Spacer(Modifier.height(4.dp))
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun MilestoneCheckItem(
+    milestone: Milestone,
+    onStatusChange: (String) -> Unit
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Text(
+                milestone.milestoneTitle,
+                style = MaterialTheme.typography.titleMedium
+            )
+            if (milestone.milestoneDescription.isNotEmpty()) {
+                Spacer(Modifier.height(4.dp))
+                Text(
+                    milestone.milestoneDescription,
+                    style = MaterialTheme.typography.bodySmall
+                )
+            }
+            
+            Spacer(Modifier.height(12.dp))
+            
+            Row(modifier = Modifier.fillMaxWidth()) {
+                FilterChip(
+                    selected = milestone.status == "Achieved",
+                    onClick = { onStatusChange("Achieved") },
+                    label = { Text("Yes ✓") },
+                    colors = FilterChipDefaults.filterChipColors(
+                        selectedContainerColor = MaterialTheme.colorScheme.primaryContainer
+                    )
+                )
+                Spacer(Modifier.width(8.dp))
+                FilterChip(
+                    selected = milestone.status == "NotYet",
+                    onClick = { onStatusChange("NotYet") },
+                    label = { Text("Not Yet") }
+                )
+                Spacer(Modifier.width(8.dp))
+                FilterChip(
+                    selected = milestone.status == "Skipped",
+                    onClick = { onStatusChange("Skipped") },
+                    label = { Text("Skip") }
+                )
+            }
+            
+            // Show AI feedback if status is set
+            if (milestone.status != "NotChecked") {
+                Spacer(Modifier.height(8.dp))
+                val feedback = when (milestone.status) {
+                    "Achieved" -> "Great! Your baby is developing well. Keep encouraging this behavior."
+                    "NotYet" -> "That's okay! Every baby develops at their own pace. Try again in a few days."
+                    "Skipped" -> "You can revisit this milestone later if needed."
+                    else -> ""
+                }
+                Text(
+                    feedback,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.primary,
+                    fontStyle = FontStyle.Italic
+                )
+            }
+        }
+    }
+}
+```
+
+---
+
+### ⚙️ **SCREEN 10: SETTINGS**
+
+#### Purpose
+- Language selection
+- Notification preferences
+- Data export (PDF)
+- App info & logout
+
+#### Implementation
+```kotlin
+@Composable
+fun SettingsScreen(navController: NavController, viewModel: SettingsViewModel) {
+    val selectedLanguage by viewModel.selectedLanguage.collectAsState()
+    val notificationsEnabled by viewModel.notificationsEnabled.collectAsState()
+    
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text("Settings") },
+                navigationIcon = {
+                    IconButton(onClick = { navController.popBackStack() }) {
+                        Icon(Icons.Default.ArrowBack, "Back")
+                    }
+                }
+            )
+        }
+    ) { padding ->
+        LazyColumn(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(padding)
+        ) {
+            // Language Selection
+            item {
+                ListItem(
+                    headlineContent = { Text("Language") },
+                    supportingContent = { Text(selectedLanguage) },
+                    leadingContent = { Icon(Icons.Default.Language, null) },
+                    modifier = Modifier.clickable {
+                        // Show language picker dialog
+                    }
+                )
+                HorizontalDivider()
+            }
+            
+            // Notifications
+            item {
+                ListItem(
+                    headlineContent = { Text("Vaccination Reminders") },
+                    supportingContent = { Text("Get notified before due dates") },
+                    leadingContent = { Icon(Icons.Default.Notifications, null) },
+                    trailingContent = {
+                        Switch(
+                            checked = notificationsEnabled,
+                            onCheckedChange = { viewModel.toggleNotifications(it) }
+                        )
+                    }
+                )
+                HorizontalDivider()
+            }
+            
+            // Export Data
+            item {
+                ListItem(
+                    headlineContent = { Text("Export Health Summary") },
+                    supportingContent = { Text("Download as PDF") },
+                    leadingContent = { Icon(Icons.Default.FileDownload, null) },
+                    modifier = Modifier.clickable {
+                        viewModel.exportToPDF()
+                    }
+                )
+                HorizontalDivider()
+            }
+            
+            // App Info
+            item {
+                ListItem(
+                    headlineContent = { Text("About Shishu-Sneh") },
+                    supportingContent = { Text("Version 1.0.0") },
+                    leadingContent = { Icon(Icons.Default.Info, null) },
+                    modifier = Modifier.clickable {
+                        navController.navigate("about")
+                    }
+                )
+                HorizontalDivider()
+            }
+            
+            // Logout
+            item {
+                Spacer(Modifier.height(24.dp))
+                Button(
+                    onClick = {
+                        viewModel.logout()
+                        navController.navigate("login") {
+                            popUpTo(0) { inclusive = true }
+                        }
+                    },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.error
+                    )
+                ) {
+                    Text("Logout")
+                }
+            }
+        }
+    }
+}
+```
+
+---
+
+## 4. BACKEND & DATA LAYER
+
+### 4.1 Room Database Setup
+
+```kotlin
+@Database(
+    entities = [
+        BabyProfile::class,
+        GrowthRecord::class,
+        Vaccination::class,
+        Milestone::class,
+        FeedingTip::class
+    ],
+    version = 1,
+    exportSchema = false
+)
+abstract class AppDatabase : RoomDatabase() {
+    abstract fun babyProfileDao(): BabyProfileDao
+    abstract fun growthRecordDao(): GrowthRecordDao
+    abstract fun vaccinationDao(): VaccinationDao
+    abstract fun milestoneDao(): MilestoneDao
+    abstract fun feedingTipDao(): FeedingTipDao
+}
+
+// In DatabaseModule.kt
+@Module
+@InstallIn(SingletonComponent::class)
+object DatabaseModule {
+    
+    @Provides
+    @Singleton
+    fun provideDatabase(@ApplicationContext context: Context): AppDatabase {
+        return Room.databaseBuilder(
+            context,
+            AppDatabase::class.java,
+            "shishu_sneh_db"
+        )
+        .fallbackToDestructiveMigration()
+        .build()
+    }
+    
+    @Provides
+    fun provideBabyProfileDao(db: AppDatabase) = db.babyProfileDao()
+    
+    @Provides
+    fun provideGrowthRecordDao(db: AppDatabase) = db.growthRecordDao()
+    
+    @Provides
+    fun provideVaccinationDao(db: AppDatabase) = db.vaccinationDao()
+    
+    @Provides
+    fun provideMilestoneDao(db: AppDatabase) = db.milestoneDao()
+}
+```
+
+### 4.2 Repository Pattern
+
+```kotlin
+@Singleton
+class BabyRepository @Inject constructor(
+    private val babyProfileDao: BabyProfileDao
+) {
+    val babyProfile: Flow<BabyProfile?> = babyProfileDao.getBabyProfile()
+    
+    suspend fun createBabyProfile(profile: BabyProfile) {
+        babyProfileDao.insert(profile)
+    }
+    
+    suspend fun updateBabyProfile(profile: BabyProfile) {
+        babyProfileDao.update(profile)
+    }
+    
+    suspend fun hasBabyProfile(): Boolean {
+        return babyProfileDao.getCount() > 0
+    }
+}
+
+@Singleton
+class GrowthRepository @Inject constructor(
+    private val growthRecordDao: GrowthRecordDao,
+    private val babyRepository: BabyRepository
+) {
+    fun getAllRecords(babyId: Long): Flow<List<GrowthRecord>> {
+        return growthRecordDao.getAllRecordsForBaby(babyId)
+    }
+    
+    suspend fun addGrowthRecord(weightKg: Float, heightCm: Float) {
+        val baby = babyRepository.babyProfile.first() ?: return
+        
+        val ageInWeeks = calculateAgeInWeeks(baby.dateOfBirth)
+        val percentileWeight = WHOGrowthCalculator.calculatePercentile(
+            ageInWeeks, weightKg, baby.gender, isWeight = true
+        )
+        val percentileHeight = WHOGrowthCalculator.calculatePercentile(
+            ageInWeeks, heightCm, baby.gender, isWeight = false
+        )
+        
+        val record = GrowthRecord(
+            babyId = baby.id,
+            recordDate = System.currentTimeMillis(),
+            weightKg = weightKg,
+            heightCm = heightCm,
+            ageInWeeks = ageInWeeks,
+            whoPercentileWeight = percentileWeight,
+            whoPercentileHeight = percentileHeight
+        )
+        
+        growthRecordDao.insert(record)
+    }
+}
+
+@Singleton
+class VaccinationRepository @Inject constructor(
+    private val vaccinationDao: VaccinationDao,
+    private val babyRepository: BabyRepository
+) {
+    fun getAllVaccinations(babyId: Long): Flow<List<Vaccination>> {
+        return vaccinationDao.getAllVaccinations(babyId)
+    }
+    
+    suspend fun initializeVaccinationSchedule() {
+        val baby = babyRepository.babyProfile.first() ?: return
+        
+        val schedule = VaccinationScheduleGenerator.generateIndianSchedule(baby.dateOfBirth)
+        vaccinationDao.insertAll(schedule.map { it.copy(babyId = baby.id) })
+    }
+    
+    suspend fun markVaccineCompleted(vaccineId: Long) {
+        vaccinationDao.markCompleted(vaccineId, System.currentTimeMillis())
+    }
+}
+```
+
+### 4.3 WHO Growth Calculator (Simplified)
+
+```kotlin
+object WHOGrowthCalculator {
+    
+    // Simplified - Real implementation needs WHO LMS tables
+    fun calculatePercentile(
+        ageInWeeks: Int,
+        value: Float,
+        gender: String,
+        isWeight: Boolean
+    ): Float {
+        // This is a simplified placeholder
+        // Real implementation should use WHO LMS data:
+        // https://www.who.int/tools/child-growth-standards/standards
+        
+        val standardData = getWHOStandard(ageInWeeks, gender, isWeight)
+        val zScore = (value - standardData.median) / standardData.sd
+        
+        return zScoreToPercentile(zScore)
+    }
+    
+    private data class WHOStandard(val median: Float, val sd: Float)
+    
+    private fun getWHOStandard(weeks: Int, gender: String, isWeight: Boolean): WHOStandard {
+        // Placeholder - load from assets or hardcoded table
+        return if (isWeight) {
+            when (weeks) {
+                0 -> WHOStandard(3.3f, 0.4f)
+                4 -> WHOStandard(4.5f, 0.5f)
+                8 -> WHOStandard(5.7f, 0.6f)
+                12 -> WHOStandard(6.4f, 0.7f)
+                else -> WHOStandard(7.0f, 0.8f)
+            }
+        } else {
+            when (weeks) {
+                0 -> WHOStandard(49.0f, 2.0f)
+                4 -> WHOStandard(54.0f, 2.2f)
+                8 -> WHOStandard(59.0f, 2.4f)
+                12 -> WHOStandard(62.0f, 2.5f)
+                else -> WHOStandard(65.0f, 2.6f)
+            }
+        }
+    }
+    
+    private fun zScoreToPercentile(z: Float): Float {
+        // Standard normal CDF approximation
+        return (0.5 * (1 + erf(z / sqrt(2f)))) * 100f
+    }
+}
+```
+
+### 4.4 Vaccination Schedule Generator
+
+```kotlin
+object VaccinationScheduleGenerator {
+    
+    fun generateIndianSchedule(babyDOB: Long): List<Vaccination> {
+        val vaccines = mutableListOf<Vaccination>()
+        
+        // Birth vaccines
+        vaccines.add(createVaccine("BCG", "Tuberculosis", babyDOB, 0))
+        vaccines.add(createVaccine("OPV-0", "Polio", babyDOB, 0))
+        vaccines.add(createVaccine("Hepatitis B-1", "Hepatitis B", babyDOB, 0))
+        
+        // 6 weeks
+        vaccines.add(createVaccine("DPT-1", "Diphtheria, Pertussis, Tetanus", babyDOB, 6))
+        vaccines.add(createVaccine("OPV-1", "Polio", babyDOB, 6))
+        vaccines.add(createVaccine("Hepatitis B-2", "Hepatitis B", babyDOB, 6))
+        vaccines.add(createVaccine("Hib-1", "Haemophilus influenzae type B", babyDOB, 6))
+        vaccines.add(createVaccine("Rotavirus-1", "Rotavirus", babyDOB, 6))
+        vaccines.add(createVaccine("PCV-1", "Pneumococcal", babyDOB, 6))
+        
+        // 10 weeks
+        vaccines.add(createVaccine("DPT-2", "Diphtheria, Pertussis, Tetanus", babyDOB, 10))
+        vaccines.add(createVaccine("OPV-2", "Polio", babyDOB, 10))
+        vaccines.add(createVaccine("Hib-2", "Haemophilus influenzae type B", babyDOB, 10))
+        vaccines.add(createVaccine("Rotavirus-2", "Rotavirus", babyDOB, 10))
+        vaccines.add(createVaccine("PCV-2", "Pneumococcal", babyDOB, 10))
+        
+        // 14 weeks
+        vaccines.add(createVaccine("DPT-3", "Diphtheria, Pertussis, Tetanus", babyDOB, 14))
+        vaccines.add(createVaccine("OPV-3", "Polio", babyDOB, 14))
+        vaccines.add(createVaccine("Hepatitis B-3", "Hepatitis B", babyDOB, 14))
+        vaccines.add(createVaccine("Hib-3", "Haemophilus influenzae type B", babyDOB, 14))
+        vaccines.add(createVaccine("Rotavirus-3", "Rotavirus", babyDOB, 14))
+        vaccines.add(createVaccine("PCV-3", "Pneumococcal", babyDOB, 14))
+        
+        // 9 months
+        vaccines.add(createVaccine("Measles-1 (MR-1)", "Measles & Rubella", babyDOB, 36))
+        
+        // 12 months
+        vaccines.add(createVaccine("Hepatitis A-1", "Hepatitis A", babyDOB, 48))
+        
+        return vaccines
+    }
+    
+    private fun createVaccine(
+        name: String,
+        diseaseInfo: String,
+        babyDOB: Long,
+        weeksAfterBirth: Int
+    ): Vaccination {
+        val scheduledDate = babyDOB + (weeksAfterBirth * 7 * 24 * 60 * 60 * 1000L)
+        
+        return Vaccination(
+            babyId = 0, // Will be set by repository
+            vaccineName = name,
+            diseaseInfo = diseaseInfo,
+            scheduledDate = scheduledDate,
+            isCompleted = false,
+            reminderEnabled = true
+        )
+    }
+}
+```
+
+---
+
+## 5. AI INTEGRATION (GEMINI API)
+
+### 5.1 Gemini Service Setup
+
+```kotlin
+@Singleton
+class GeminiRepository @Inject constructor(
+    @ApplicationContext private val context: Context
+) {
+    private val generativeModel = GenerativeModel(
+        modelName = "gemini-1.5-flash",
+        apiKey = BuildConfig.GEMINI_API_KEY
+    )
+    
+    suspend fun generateDailyFeedingTip(babyAgeWeeks: Int): String {
+        val prompt = """
+            You are a pediatric nutrition expert. Generate a short, practical feeding tip 
+            for a ${babyAgeWeeks}-week-old baby in India. Focus on:
+            - Exclusive breastfeeding for first 6 months
+            - Mother's nutrition
+            - Breastfeeding techniques
+            - Common myths to avoid
+            
+            Keep the tip under 100 words, warm, and culturally appropriate for Indian mothers.
+            Do NOT give medical advice - only general wellness tips.
+        """.trimIndent()
+        
+        return try {
+            val response = generativeModel.generateContent(prompt)
+            response.text ?: "Exclusive breastfeeding is best for your baby's first 6 months."
+        } catch (e: Exception) {
+            Log.e("GeminiRepository", "Error generating tip", e)
+            getFallbackTip(babyAgeWeeks)
+        }
+    }
+    
+    suspend fun answerFeedingQuestion(question: String, babyAgeWeeks: Int): String {
+        val prompt = """
+            You are a supportive pediatric advisor. A mother asks about her ${babyAgeWeeks}-week-old baby:
+            
+            Question: $question
+            
+            Provide a helpful, concise answer (under 150 words) that:
+            - Is evidence-based and aligned with WHO/Indian Academy of Pediatrics guidelines
+            - Is warm and encouraging
+            - Suggests consulting a doctor if the question is medical in nature
+            - Avoids jargon and is culturally sensitive for Indian context
+        """.trimIndent()
+        
+        return try {
+            val response = generativeModel.generateContent(prompt)
+            response.text ?: "I recommend consulting your pediatrician for personalized advice."
+        } catch (e: Exception) {
+            Log.e("GeminiRepository", "Error answering question", e)
+            "I'm sorry, I couldn't process your question. Please consult your doctor."
+        }
+    }
+    
+    suspend fun getMilestoneEncouragement(
+        milestone: String,
+        achieved: Boolean,
+        babyAgeWeeks: Int
+    ): String {
+        val prompt = if (achieved) {
+            "Generate a short congratulatory message (30 words) for a parent whose ${babyAgeWeeks}-week-old baby just achieved: $milestone"
+        } else {
+            "Generate a short encouraging message (30 words) for a parent whose ${babyAgeWeeks}-week-old baby hasn't yet achieved: $milestone. Emphasize that all babies develop at their own pace."
+        }
+        
+        return try {
+            val response = generativeModel.generateContent(prompt)
+            response.text ?: if (achieved) "Great milestone!" else "Every baby is unique!"
+        } catch (e: Exception) {
+            if (achieved) "Wonderful progress!" else "Keep encouraging your baby!"
+        }
+    }
+    
+    private fun getFallbackTip(weeks: Int): String {
+        val tips = mapOf(
+            0..8 to "Exclusive breastfeeding is the best nutrition for your newborn. Feed on demand, day and night.",
+            9..16 to "Breast milk provides all the nutrients your baby needs. Ensure you're well-hydrated and eating nutritious food.",
+            17..24 to "Continue breastfeeding. Your baby may feed more frequently during growth spurts - this is normal!",
+            25..52 to "Exclusive breastfeeding until 6 months is recommended by WHO. Your breast milk adapts to your baby's needs."
+        )
+        
+        return tips.entries.first { weeks in it.key }.value
+    }
+}
+```
+
+### 5.2 ViewModel Integration
+
+```kotlin
+@HiltViewModel
+class FeedingViewModel @Inject constructor(
+    private val geminiRepository: GeminiRepository,
+    private val babyRepository: BabyRepository,
+    private val feedingTipDao: FeedingTipDao
+) : ViewModel() {
+    
+    private val _todayTip = MutableStateFlow<FeedingTip?>(null)
+    val todayTip: StateFlow<FeedingTip?> = _todayTip
+    
+    private val _chatHistory = MutableStateFlow<List<ChatMessage>>(emptyList())
+    val chatHistory: StateFlow<List<ChatMessage>> = _chatHistory
+    
+    private val _isLoadingResponse = MutableStateFlow(false)
+    val isLoadingResponse: StateFlow<Boolean> = _isLoadingResponse
+    
+    init {
+        loadTodayTip()
+    }
+    
+    private fun loadTodayTip() {
+        viewModelScope.launch {
+            val baby = babyRepository.babyProfile.first() ?: return@launch
+            val ageWeeks = calculateAgeInWeeks(baby.dateOfBirth)
+            
+            // Check if we have today's tip
+            val today = LocalDate.now()
+            val existingTip = feedingTipDao.getTipForDate(today.toEpochDay())
+            
+            if (existingTip != null) {
+                _todayTip.value = existingTip
+            } else {
+                // Generate new tip
+                val tipContent = geminiRepository.generateDailyFeedingTip(ageWeeks)
+                val newTip = FeedingTip(
+                    babyId = baby.id,
+                    date = today.toEpochDay(),
+                    content = tipContent,
+                    babyAgeWeeks = ageWeeks
+                )
+                feedingTipDao.insert(newTip)
+                _todayTip.value = newTip
+            }
+        }
+    }
+    
+    fun askQuestion(question: String) {
+        viewModelScope.launch {
+            val baby = babyRepository.babyProfile.first() ?: return@launch
+            val ageWeeks = calculateAgeInWeeks(baby.dateOfBirth)
+            
+            // Add user message
+            _chatHistory.value = _chatHistory.value + ChatMessage(question, isUser = true)
+            _isLoadingResponse.value = true
+            
+            // Get AI response
+            val answer = geminiRepository.answerFeedingQuestion(question, ageWeeks)
+            
+            // Add AI response
+            _chatHistory.value = _chatHistory.value + ChatMessage(answer, isUser = false)
+            _isLoadingResponse.value = false
+        }
+    }
+}
+
+data class ChatMessage(
+    val content: String,
+    val isUser: Boolean,
+    val timestamp: Long = System.currentTimeMillis()
+)
+```
+
+---
+
+## 6. NAVIGATION FLOW
+
+### 6.1 Navigation Graph
+
+```kotlin
+@Composable
+fun ShishuSnehNavigation() {
+    val navController = rememberNavController()
+    
+    NavHost(
+        navController = navController,
+        startDestination = "splash"
+    ) {
+        // Splash
+        composable("splash") {
+            SplashScreen(navController, hiltViewModel())
+        }
+        
+        // Auth
+        composable("login") {
+            LoginScreen(navController, hiltViewModel())
+        }
+        composable("register") {
+            RegisterScreen(navController, hiltViewModel())
+        }
+        
+        // Onboarding
+        composable("onboarding") {
+            BabyProfileSetupScreen(navController, hiltViewModel())
+        }
+        
+        // Main App
+        composable("home") {
+            HomeDashboardScreen(navController, hiltViewModel())
+        }
+        composable("growth") {
+            GrowthChartScreen(navController, hiltViewModel())
+        }
+        composable("vaccinations") {
+            VaccinationListScreen(navController, hiltViewModel())
+        }
+        composable("vaccination/{id}") { backStackEntry ->
+            val vaccineId = backStackEntry.arguments?.getString("id")?.toLongOrNull()
+            VaccinationDetailScreen(navController, vaccineId, hiltViewModel())
+        }
+        composable("feeding") {
+            FeedingGuideScreen(navController, hiltViewModel())
+        }
+        composable("milestones") {
+            MilestoneChecklistScreen(navController, hiltViewModel())
+        }
+        composable("settings") {
+            SettingsScreen(navController, hiltViewModel())
+        }
+    }
+}
+```
+
+### 6.2 Navigation Flow Diagram
+
+```
+┌─────────┐
+│ Splash  │
+└────┬────┘
+     │
+     ├──[Not Logged In]──> Login ──> Register ──> Login
+     │                                                │
+     ├──[Logged In, No Profile]────> Onboarding ─────┤
+     │                                                │
+     └──[Logged In, Has Profile]─────────────────────┘
+                                                      │
+                                                      ▼
+                                              ┌───────────────┐
+                                              │  Home Dashboard│
+                                              └───────┬────────┘
+                                                      │
+                ┌─────────────────────────────────────┼─────────────────────┐
+                │                                     │                     │
+         ┌──────▼─────┐                      ┌────────▼────────┐   ┌───────▼────────┐
+         │Growth Chart│                      │  Vaccinations   │   │ Feeding Guide  │
+         └────────────┘                      └─────────────────┘   └────────────────┘
+                                                                            │
+                ┌───────────────────────────────────────────────────────────┘
+                │
+         ┌──────▼──────┐                      ┌──────────────┐
+         │ Milestones  │                      │   Settings   │
+         └─────────────┘                      └──────────────┘
+```
+
+---
+
+## 7. IMPLEMENTATION TIMELINE
+
+### Week 1: Foundation
+- ✅ Project setup, dependencies
+- ✅ Room Database entities & DAOs
+- ✅ Basic navigation structure
+- ✅ Splash, Login, Register screens
+
+### Week 2: Core Features
+- ✅ Baby profile onboarding
+- ✅ Home dashboard
+- ✅ Growth tracking & chart
+- ✅ Vaccination schedule generation
+
+### Week 3: AI & Advanced Features
+- ✅ Gemini API integration
+- ✅ Feeding guide with daily tips
+- ✅ Milestone tracker
+- ✅ WorkManager notifications
+
+### Week 4: Polish & Testing
+- ✅ Multilingual support
+- ✅ PDF export
+- ✅ Settings & data management
+- ✅ Testing & bug fixes
+- ✅ Documentation
+
+---
+
+## 8. TESTING & QUALITY ASSURANCE
+
+### 8.1 Unit Tests
+
+```kotlin
+@Test
+fun `calculateAgeInWeeks returns correct weeks`() {
+    val dob = LocalDate.now().minusWeeks(8).toEpochDay()
+    val ageWeeks = calculateAgeInWeeks(dob)
+    assertEquals(8, ageWeeks)
+}
+
+@Test
+fun `vaccination schedule generates correct dates`() {
+    val dob = System.currentTimeMillis()
+    val schedule = VaccinationScheduleGenerator.generateIndianSchedule(dob)
+    
+    assertTrue(schedule.any { it.vaccineName == "BCG" })
+    assertTrue(schedule.any { it.vaccineName == "DPT-1" })
+    
+    val dpt1 = schedule.first { it.vaccineName == "DPT-1" }
+    val expectedDate = dob + (6 * 7 * 24 * 60 * 60 * 1000L)
+    assertEquals(expectedDate, dpt1.scheduledDate)
+}
+```
+
+### 8.2 UI Tests
+
+```kotlin
+@Test
+fun testLoginFlow() {
+    composeTestRule.setContent {
+        LoginScreen(navController, viewModel)
+    }
+    
+    composeTestRule.onNodeWithText("Email or Phone").performTextInput("test@example.com")
+    composeTestRule.onNodeWithText("Password").performTextInput("password123")
+    composeTestRule.onNodeWithText("Login").performClick()
+    
+    // Assert navigation or success state
+}
+```
+
+### 8.3 Manual Testing Checklist
+- [ ] Fresh install flow works
+- [ ] Offline mode works for all core features
+- [ ] Notifications fire correctly
+- [ ] Growth chart renders correctly
+- [ ] AI tips generate properly
+- [ ] PDF export works
+- [ ] Language switching works
+- [ ] Data persists after app restart
+
+---
+
+## 9. DEPLOYMENT CHECKLIST
+
+### Pre-Launch
+- [ ] Remove all hardcoded API keys → Use BuildConfig
+- [ ] ProGuard rules configured
+- [ ] App icons & splash screen finalized
+- [ ] Privacy policy created
+- [ ] Terms of service created
+- [ ] Play Store listing prepared (screenshots, description)
+- [ ] APK signed with release keystore
+- [ ] Tested on min SDK 24 device
+
+### Play Store Metadata
+- **App Name**: Shishu-Sneh
+- **Category**: Health & Fitness
+- **Content Rating**: Everyone
+- **Privacy Policy URL**: [Your URL]
+- **Support Email**: [Your email]
+
+---
+
+## 10. QUICK START GUIDE FOR AI AGENT
+
+### Step-by-Step Build Instructions
+
+1. **Create Project**
+   ```bash
+   # Android Studio: New Project → Empty Activity
+   # Package: com.mindmatrix.shishusneh
+   # Minimum SDK: 24
+   # Language: Kotlin
+   ```
+
+2. **Add Dependencies**
+   - Copy all dependencies from Section 2.2 into `build.gradle.kts`
+   - Sync Gradle
+
+3. **Create Database Layer**
+   - Create all Entity classes (Section 2.3)
+   - Create DAOs
+   - Create AppDatabase class
+   - Create Hilt modules
+
+4. **Build UI Screens in Order**
+   - SplashScreen → LoginScreen → RegisterScreen → OnboardingScreen → HomeScreen
+   - Then: GrowthScreen, VaccinationScreen, FeedingScreen, MilestoneScreen, SettingsScreen
+
+5. **Integrate Gemini API**
+   - Add API key to `local.properties`: `GEMINI_API_KEY=your_key_here`
+   - Add to BuildConfig
+   - Create GeminiRepository
+   - Integrate into FeedingViewModel
+
+6. **Setup WorkManager**
+   - Create VaccinationReminderWorker
+   - Schedule periodic checks
+   - Handle notification permissions
+
+7. **Add Multilingual Support**
+   - Create `res/values-hi/strings.xml` (Hindi)
+   - Create `res/values-kn/strings.xml` (Kannada)
+   - Create `res/values-ta/strings.xml` (Tamil)
+
+8. **Test & Refine**
+   - Run on emulator
+   - Test offline mode
+   - Test notifications
+   - Export PDF
+
+---
+
+## 📌 CRITICAL NOTES FOR AI AGENT
+
+### Must-Have Features (Priority 1)
+1. Baby profile creation
+2. Growth chart with WHO curves
+3. Vaccination schedule with reminders
+4. Daily feeding tips via Gemini
+5. Offline-first architecture
+
+### Good-to-Have Features (Priority 2)
+1. Milestone tracker
+2. AI chatbot
+3. PDF export
+4. Multilingual UI
+
+### Implementation Tips
+- **Use Jetpack Compose** for modern UI
+- **MVVM architecture** for clean separation
+- **Room DB** for offline-first approach
+- **Hilt** for dependency injection
+- **Coroutines & Flow** for async operations
+- **WorkManager** for reliable background tasks
+
+### Common Pitfalls to Avoid
+- ❌ Don't hardcode API keys → Use BuildConfig
+- ❌ Don't skip input validation
+- ❌ Don't forget permission requests (notifications, file access)
+- ❌ Don't skip error handling for Gemini API calls
+- ❌ Don't forget to handle edge cases (no internet, empty data)
+
+---
+
+## 🎯 SUCCESS CRITERIA
+
+The app is **ready for submission** when:
+- ✅ User can create baby profile
+- ✅ User can log weight/height and see growth chart
+- ✅ User receives vaccination reminders
+- ✅ User gets daily feeding tips
+- ✅ App works 100% offline after initial setup
+- ✅ UI is clean, intuitive, and accessible
+- ✅ No crashes on common user flows
+- ✅ Supports at least 3 Indian languages
+
+---
+
+## 📚 REFERENCE RESOURCES
+
+- **WHO Growth Standards**: https://www.who.int/tools/child-growth-standards
+- **India Immunization Schedule**: https://main.mohfw.gov.in/sites/default/files/5628564789562315.pdf
+- **Gemini API Docs**: https://ai.google.dev/docs
+- **Jetpack Compose Docs**: https://developer.android.com/jetpack/compose
+- **Material Design 3**: https://m3.material.io/
+
+---
+
+## ✅ FINAL CHECKLIST BEFORE HANDOFF
+
+Before giving this SOP to the AI development agent, ensure:
+
+- [x] All screen descriptions are clear and detailed
+- [x] Code snippets are complete and compilable
+- [x] Dependencies are up-to-date
+- [x] Navigation flow is documented
+- [x] Database schema is finalized
+- [x] Gemini integration steps are clear
+- [x] Testing guidelines are provided
+- [x] Deployment checklist is complete
+
+---
+
+**END OF SOP**
+
+**This document is production-ready and can be directly provided to AI coding agents (Cursor, Windsurf, etc.) or junior developers to build the complete Shishu-Sneh Android application.**

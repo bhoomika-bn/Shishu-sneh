@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="ic_launcher_background">#EEF7F3</color>
+    <string name="app_name">Shishu-Sneh</string>
+    <style name="Theme.ShishuSneh" parent="android:style/Theme.Material.Light.NoActionBar"/>
+</resources>
