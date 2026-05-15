@@ -1,6 +1,6 @@
 # Shishu-Sneh Android App
 
-Shishu-Sneh is a Kotlin Android app for first-year baby health tracking. It is built with Jetpack Compose and an offline-first Room database.
+Shishu-Sneh is a Kotlin Android app for first-year baby health tracking. It is built with Jetpack Compose and an online-first Room database.
 
 ## What is implemented
 
