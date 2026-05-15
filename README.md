@@ -12,7 +12,7 @@ Shishu-Sneh is a Kotlin Android app for first-year baby health tracking. It is b
 - Gemini-ready advisor class using `GEMINI_API_KEY`
 - Milestone checklist
 - Settings/profile summary
-- Hindi, Kannada and Tamil resource folders
+- Hindi resource folders
 
 ## Open in Android Studio
 
